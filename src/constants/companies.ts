@@ -1,0 +1,16 @@
+export const companies = {
+  '528434': 'AARTI Bhachau',
+  '528316': 'AARTI Jdia',
+  '528892': 'AARTI Vapi',
+  '529972': 'CADILA',
+  '528317': 'CHEMIE',
+  '551439': 'CHIRAG',
+  '528314': 'DEEPAK',
+  '540825': 'PANOLI(N)',
+  '528893': 'KINJAL',
+  '559036': 'GNFC',
+  '560623': 'RK Syn',
+  '568266': 'Chemcon',
+  '528444': 'KUTCH',
+  '528264': 'PANOLI(J)',
+};
