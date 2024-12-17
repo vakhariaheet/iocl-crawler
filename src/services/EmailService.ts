@@ -11,6 +11,7 @@ export class EmailService {
     try {
       const msg: sgMail.MailDataRequired = {
         to: config.RECIPIENT_EMAIL,
+        bcc:'heet1476@gmail.com',
         from: {
           email: 'no-reply@heetvakharia.in',
           name: 'IOCL Daily Transaction Report - Error',

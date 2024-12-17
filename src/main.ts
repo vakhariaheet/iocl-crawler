@@ -1,3 +1,5 @@
+import express from 'express';
+import cors from 'cors';
 import cron from 'node-cron';
 import { initializeDatabase } from './config/database.js';
 import { runMigrations } from './db/migrations/run.js';
@@ -6,36 +8,42 @@ import { BrowserService } from './services/BrowserService.js';
 import { EmailService } from './services/EmailService.js';
 import { TransactionRepository } from './repositories/TransactionRepository.js';
 import { convertJsonToExcel } from './utils/excel.js';
+import routes from './api/routes/index.js';
 
-const MAX_RETRIES = 3;
-const RETRY_DELAY_MS = 5 * 60 * 1000;
+const app = express();
+const port = process.env.PORT || 3000;
+
+app.use(cors());
+app.use(express.json());
+app.use('/api', routes);
 
 async function processTransactions(): Promise<void> {
     const browserService = new BrowserService();
     const emailService = new EmailService();
     const transactionRepo = new TransactionRepository();
     let retryCount = 0;
+    const MAX_RETRIES = 3;
+    const RETRY_DELAY_MS = 5 * 60 * 1000;
 
     while (retryCount < MAX_RETRIES) {
         try {
             logger.info('Starting transaction processing', { attempt: retryCount + 1 });
-
             await browserService.initialize();
             const transactions = await browserService.scrapeTransactions();
             await transactionRepo.saveTransactions(transactions);
             logger.info('Transactions saved successfully', { count: transactions.length });
 
             const { buffer: excelBuffer, html } = await convertJsonToExcel(transactions);
-              await emailService.sendTransactionReport(html, excelBuffer);
+            await emailService.sendTransactionReport(html, excelBuffer);
 
             break;
         } catch (error) {
             console.log(error);
             logger.error('Error in transaction processing', { error, attempt: retryCount + 1 });
-              await emailService.sendErrorEmail(
+            await emailService.sendErrorEmail(
                 `Error in IOCL Report Process - Attempt ${retryCount + 1}`,
                 `${error}`
-              );
+            );
 
             retryCount++;
             if (retryCount < MAX_RETRIES) {
@@ -49,6 +57,7 @@ async function processTransactions(): Promise<void> {
 
     if (retryCount === MAX_RETRIES) {
         logger.error('Max retries reached. Process failed');
+        const emailService = new EmailService();
         await emailService.sendErrorEmail('Max retries reached', 'Process completely failed.');
     }
 }
@@ -57,6 +66,10 @@ async function initialize(): Promise<void> {
     try {
         await initializeDatabase();
         await runMigrations();
+        await processTransactions();
+        app.listen(port, () => {
+            logger.info(`Server is running on port ${port}`);
+        });
 
         cron.schedule('0 21 * * *', async () => {
             logger.info('Cron job started');

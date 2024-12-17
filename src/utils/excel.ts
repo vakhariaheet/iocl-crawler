@@ -76,6 +76,20 @@ async function getAggregatedData(records: Transaction[]): Promise<{ Name: string
     args: [ DateTime.now().startOf('month').toFormat('dd.MM.yyyy'), DateTime.now().toFormat('dd.MM.yyyy') ],
   }));
 
+  for (const record of mtdResults.rows) {
+    let mtd = Number(record.mtd);
+    if (DateTime.now().month === 12 && DateTime.now().year === 2024) {
+      if (record.company_name === 'KUTCH') {
+        mtd += 452.150;
+      }
+      if(record.company_name === 'CHEMIE') {
+        mtd += 119.992;
+      }
+    }
+    if(mtd > 0) {
+      aggregatedData[ record.company_name.toString() ] = { DAILY: 0, MTD: mtd };
+    }
+  }
   
 
   for (const record of todayRecords) {
@@ -84,14 +98,6 @@ async function getAggregatedData(records: Transaction[]): Promise<{ Name: string
 
     if (!aggregatedData[ key ]) {
       aggregatedData[ key ] = { DAILY: 0, MTD: mtdResults.rows.find((result) => result.company_name === key)?.mtd as number || 0 };
-      if (DateTime.now().month === 12 && DateTime.now().year === 2024) {
-        if (key === 'KUTCH') {
-          aggregatedData[ key ].MTD += 452.150;
-        }
-        if(key === 'CHEMIE') {
-          aggregatedData[ key ].MTD += 119.992;
-        }
-      }
     }
     
 

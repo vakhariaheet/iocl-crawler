@@ -82,10 +82,10 @@ export class BrowserService {
       const table = document.querySelector('table[width="1350"]');
       if (!table) return [];
 
-      const headers = Array.from(table.querySelectorAll('tr:first-child td'))
+      const headers = Array.from(table.querySelectorAll('tbody:nth-child(1) > tr > td'))
         .map(cell => cell.textContent?.trim() || '');
 
-      return Array.from(table.querySelectorAll('tr:not(:first-child)')).map(row => {
+      return Array.from(table.querySelectorAll('tbody:nth-child(2) > tr')).map(row => {
         const cells = Array.from(row.querySelectorAll('td'));
         return cells.reduce((acc, cell, index) => {
           acc[headers[index]] = cell.textContent?.trim() || '';

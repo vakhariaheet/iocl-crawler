@@ -1,0 +1,20 @@
+version: '3.8'
+
+services:
+  app:
+    build: 
+      context: .
+      dockerfile: Dockerfile
+    restart: always
+    # Optional: Add environment variables if needed
+    # environment:
+      # - NODE_ENV=production
+    
+    # Optional: Map ports if your application needs to expose any
+    ports:
+      - "3989:3000"
+    
+    # Optional: Add volume mounts if you need persistent storage
+    volumes:
+      - ./logs:/app/logs
+      # - ./data:/app/data
