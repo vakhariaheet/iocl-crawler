@@ -24,6 +24,10 @@ export async function convertJsonToExcel(jsonData: Transaction[]) {
   const aggregatedWorksheet = workbook.addWorksheet('Aggregated');
   aggregatedWorksheet.mergeCells('A1:C1');
   aggregatedWorksheet.mergeCells('A2:C2');
+  console.log(aggregatedData.all.length);
+  const worksheetMonthAll = workbook.addWorksheet('Monthly Transactions');
+  worksheetMonthAll.columns = Object.keys(aggregatedData.all[ 0 ]).map((key) => ({ header: key, key }));
+  worksheetMonthAll.addRows(aggregatedData.all);
 
   aggregatedWorksheet.getCell('A1').value = `${currentMonth}'s ${currentYear}`;
   aggregatedWorksheet.getCell('A1').alignment = { horizontal: 'center' };
@@ -35,24 +39,31 @@ export async function convertJsonToExcel(jsonData: Transaction[]) {
   aggregatedWorksheet.getCell('A3').value = 'Name';
   aggregatedWorksheet.getCell('B3').value = 'DAILY';
   aggregatedWorksheet.getCell('C3').value = 'MTD';
-  aggregatedData.forEach((row, index) => {
+  aggregatedData.aggregated.forEach((row, index) => {
     aggregatedWorksheet.getCell(`A${index + 4}`).value = row.Name;
     aggregatedWorksheet.getCell(`B${index + 4}`).value = row.DAILY;
     aggregatedWorksheet.getCell(`C${index + 4}`).value = row.MTD;
   });
 
-  aggregatedWorksheet.getRow(aggregatedData.length + 3).fill = {
+  aggregatedWorksheet.getRow(aggregatedData.aggregated.length + 3).fill = {
     type: 'pattern',
     pattern: 'solid',
     fgColor: { argb: 'D9D8D8' },
   };
-  aggregatedWorksheet.getRow(aggregatedData.length + 3).font = {
+  aggregatedWorksheet.getRow(aggregatedData.aggregated.length + 3).font = {
     bold: true,
   }
 
   workbook.creator = 'IOCL';
   workbook.getImage(1);
-  return { buffer: Buffer.from(await workbook.xlsx.writeBuffer()), html: generateBenzeneEmailTemplate({ month: `${currentMonth} ${currentYear}`, rows: aggregatedData }) };
+  return {
+    buffer: Buffer.from(await workbook.xlsx.writeBuffer()),
+    html: generateBenzeneEmailTemplate({
+      month: `${currentMonth} ${currentYear}`,
+      rows: aggregatedData.aggregated
+    }),
+    aggregatedData:aggregatedData.aggregated
+  };
 }
 
 interface RowPos {
@@ -62,10 +73,15 @@ interface RowPos {
 
 
 
-async function getAggregatedData(records: Transaction[]): Promise<{ Name: string; DAILY: number; MTD: number }[]> {
+async function getAggregatedData(records: Transaction[]): Promise<{ all: Transaction[]; aggregated: { Name: string; DAILY: number; MTD: number }[] }> {
   const aggregatedData: { [ key: string ]: { DAILY: number; MTD: number } } = {};
   const todayRecords = records.filter(record => record.transactionDate === DateTime.now().toFormat('dd.MM.yyyy'));
-  
+  const monthlyTotalTrans = (await db.execute({
+    sql: `SELECT * FROM transactions
+        WHERE transaction_date BETWEEN ? AND ?
+        `,
+    args: [ DateTime.now().startOf('month').toFormat('dd.MM.yyyy'), DateTime.now().toFormat('dd.MM.yyyy') ],
+  }));
   const mtdResults = (await db.execute({
     sql: `
         SELECT company_name,SUM(bill_qty) as mtd FROM transactions
@@ -78,19 +94,19 @@ async function getAggregatedData(records: Transaction[]): Promise<{ Name: string
 
   for (const record of mtdResults.rows) {
     let mtd = Number(record.mtd);
-    if (DateTime.now().month === 12 && DateTime.now().year === 2024) {
+    if (DateTime.now().month === 1 && DateTime.now().year === 2025) {
       if (record.company_name === 'KUTCH') {
-        mtd += 452.150;
+        mtd += 1625.159;
       }
-      if(record.company_name === 'CHEMIE') {
-        mtd += 119.992;
+      if (record.company_name === 'CHEMIE') {
+        mtd += 471.394;
       }
     }
-    if(mtd > 0) {
+    if (mtd > 0) {
       aggregatedData[ record.company_name.toString() ] = { DAILY: 0, MTD: mtd };
     }
   }
-  
+
 
   for (const record of todayRecords) {
     const { companyName: name, billQty: qty, billAmt: amount } = record;
@@ -99,21 +115,43 @@ async function getAggregatedData(records: Transaction[]): Promise<{ Name: string
     if (!aggregatedData[ key ]) {
       aggregatedData[ key ] = { DAILY: 0, MTD: mtdResults.rows.find((result) => result.company_name === key)?.mtd as number || 0 };
     }
-    
+
 
     aggregatedData[ key ].DAILY += qty;
   }
   aggregatedData[ 'Total' ] = { DAILY: 0, MTD: 0 };
   for (const key in aggregatedData) {
-    
+
     if (key === 'Total') continue;
     aggregatedData[ 'Total' ].DAILY += aggregatedData[ key ].DAILY;
     aggregatedData[ 'Total' ].MTD += aggregatedData[ key ].MTD;
   }
-  return Object.entries(aggregatedData).map(([ name, data ]) => ({
-    Name: name,
-    DAILY: data.DAILY,
-    MTD: data.MTD,
-  }));
+  return {
+    aggregated: Object.entries(aggregatedData).map(([ name, data ]) => ({
+      Name: name,
+      DAILY: data.DAILY,
+      MTD: data.MTD,
+    })),
+    all: monthlyTotalTrans.rows.map((e) => ({
+      billAmt: Number(e.bill_amt || 0),
+      billQty: Number(e.bill_qty || 0),
+      cca: e.cca?.toString(),
+      comp: Number(e.comp || 0),
+      dbCr: e.db_cr?.toString(),
+      docNo: Number(e.doc_no || 0),
+      docType: e.doc_type?.toString(),
+      material: Number(e.material || 0),
+      materialName: e.material_name?.toString(),
+      orderNo: Number(e.order_no || 0),
+      plant: Number(e.plant || 0),
+      shipToParty: Number(e.ship_to_party || 0),
+      soldToParty: Number(e.sold_to_party || 0),
+      transactionDate: e.transaction_date?.toString(),
+      transactionTime: e.transaction_time?.toString(),
+      ttNo: e.tt_no?.toString(),
+      unit: e.unit?.toString(),
+      companyName: e.company_name?.toString()
+    }))
+  };
 }
 

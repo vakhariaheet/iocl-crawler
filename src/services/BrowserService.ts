@@ -38,8 +38,13 @@ export class BrowserService {
 
     try {
       page.on('response', async (response) => {
-        if (response.url() === 'https://spandan.indianoil.co.in/ioconline/CaptchImage' && response.status() === 200) {
-          captchaBuffer = await response?.body();
+        try {
+
+          if (response.url() === 'https://spandan.indianoil.co.in/ioconline/CaptchImage' && response.status() === 200) {
+            captchaBuffer = await response?.body();
+          }
+        } catch (err) {
+          console.log('Errorr');
         }
       });
 

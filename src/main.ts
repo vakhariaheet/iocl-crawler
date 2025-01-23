@@ -9,17 +9,21 @@ import { EmailService } from './services/EmailService.js';
 import { TransactionRepository } from './repositories/TransactionRepository.js';
 import { convertJsonToExcel } from './utils/excel.js';
 import routes from './api/routes/index.js';
+import { generateSalesCharts } from './utils/chartGenerator.js';
+import { WhatsAppService } from './services/WhatsAppService.js';
+import { writeFile } from 'fs';
 
 const app = express();
 const port = process.env.PORT || 3000;
-
+logger.info('Starting application', process.env);
 app.use(cors());
 app.use(express.json());
-app.use('/api', routes);
+app.use('/', routes);
 
 async function processTransactions(): Promise<void> {
     const browserService = new BrowserService();
     const emailService = new EmailService();
+    const whatsAppService = new WhatsAppService();
     const transactionRepo = new TransactionRepository();
     let retryCount = 0;
     const MAX_RETRIES = 3;
@@ -33,7 +37,9 @@ async function processTransactions(): Promise<void> {
             await transactionRepo.saveTransactions(transactions);
             logger.info('Transactions saved successfully', { count: transactions.length });
 
-            const { buffer: excelBuffer, html } = await convertJsonToExcel(transactions);
+            const { buffer: excelBuffer, html, aggregatedData } = await convertJsonToExcel(transactions);
+            logger.info('Sending WhatsApp and Email')
+            await whatsAppService.sendTransactionReport(aggregatedData,excelBuffer);
             await emailService.sendTransactionReport(html, excelBuffer);
 
             break;
@@ -66,7 +72,7 @@ async function initialize(): Promise<void> {
     try {
         await initializeDatabase();
         await runMigrations();
-        await processTransactions();
+        // await processTransactions();
         app.listen(port, () => {
             logger.info(`Server is running on port ${port}`);
         });
@@ -94,3 +100,4 @@ async function initialize(): Promise<void> {
 }
 
 initialize();
+

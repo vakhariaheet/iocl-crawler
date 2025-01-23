@@ -1,8 +1,10 @@
 import sgMail from '@sendgrid/mail';
 import { config } from '../config/env.js';
 import { logger } from '../utils/logger.js';
+import { WhatsAppService } from './WhatsAppService.js';
 
 export class EmailService {
+  private whatsAppService: WhatsAppService;
   constructor() {
     sgMail.setApiKey(config.SENDGRID_API_KEY);
   }
@@ -11,7 +13,6 @@ export class EmailService {
     try {
       const msg: sgMail.MailDataRequired = {
         to: config.RECIPIENT_EMAIL,
-        bcc:'heet1476@gmail.com',
         from: {
           email: 'no-reply@heetvakharia.in',
           name: 'IOCL Daily Transaction Report - Error',
@@ -46,8 +47,9 @@ export class EmailService {
       };
       await sgMail.send(msg);
       logger.success('Daily transaction report email sent successfully');
+      // Send WhatsApp notification with aggregated data
     } catch (error) {
-      logger.error('Failed to send transaction report email', { error });
+      logger.error('Failed to send transaction report', { error });
       throw error;
     }
   }
